@@ -109,7 +109,7 @@ Start the server:
 npm run dev
 ```
 
-Server runs on `http://localhost:5000`
+Server runs on `http://localhost:8080`
 
 ### 3. Set up the client
 
@@ -121,7 +121,7 @@ npm install
 Create `client/.env`:
 
 ```env
-VITE_SERVER_URL=http://localhost:5000
+VITE_SERVER_URL=http://localhost:8080
 ```
 
 Start the client:
@@ -165,7 +165,7 @@ npm run dev
 | `MONGO_URI` | MongoDB Atlas connection string |
 | `JWT_SECRET` | Secret key for signing JWT tokens |
 | `CLIENT_URL` | Frontend URL for CORS (use Vercel URL in production) |
-| `PORT` | Port to run the server on (default: 5000) |
+| `PORT` | Port to run the server on (default: 8080) |
 
 ### Client (`client/.env`)
 
