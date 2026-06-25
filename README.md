@@ -100,7 +100,7 @@ Create `server/.env`:
 MONGO_URI=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/chatwave
 JWT_SECRET=your_secret_key_here
 CLIENT_URL=http://localhost:5173
-PORT=5000
+PORT=8080
 ```
 
 Start the server:
