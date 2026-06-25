@@ -123,7 +123,7 @@ Start the server:
 npm run dev
 ```
 
-Server runs on `http://localhost:5000`
+Server runs on `http://localhost:8080`
 
 ### 3. Set up the client
 
@@ -135,7 +135,7 @@ npm install
 Create `client/.env`:
 
 ```env
-VITE_SERVER_URL=http://localhost:5000
+VITE_SERVER_URL=http://localhost:8080
 ```
 
 Start the client:
