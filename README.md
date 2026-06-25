@@ -109,7 +109,7 @@ Create `server/.env`:
 MONGO_URI=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/chatwave
 JWT_SECRET=your_secret_key_here
 CLIENT_URL=http://localhost:5173
-PORT=5000
+PORT=8080
 
 # Cloudinary credentials
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -179,7 +179,7 @@ npm run dev
 | `MONGO_URI` | MongoDB Atlas connection string |
 | `JWT_SECRET` | Secret key for signing JWT tokens |
 | `CLIENT_URL` | Frontend URL for CORS (use Vercel URL in production) |
-| `PORT` | Port to run the server on (default: 5000) |
+| `PORT` | Port to run the server on (default: 8080) |
 | `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | Your Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Your Cloudinary API secret |
