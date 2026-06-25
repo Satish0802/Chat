@@ -46,6 +46,10 @@ export default function ChatPage() {
   setRoomName(displayName || roomId) // Fallback to roomId if displayName is not provided
 }
 
+const handleSend = (content, type = 'text', fileName = '') => {
+  sendMessage(content, type, fileName)
+}
+
   const handleLogout = () => {
     logout()
     navigate('/login')

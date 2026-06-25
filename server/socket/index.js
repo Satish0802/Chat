@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
 import Message from '../models/Message.js'
 
-// userId → socketId mapping for online presence
 const onlineUsers = new Map()
 
 export function initSocket(httpServer) {
@@ -15,17 +14,15 @@ export function initSocket(httpServer) {
     transports: ['websocket', 'polling'],
   })
 
-  // ── Auth middleware — runs before every connection ──────────────────────────
+  // ── Auth middleware ────────────────────────────────────────────────────────
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token
       if (!token) return next(new Error('No token'))
-
       const decoded = jwt.verify(token, process.env.JWT_SECRET)
       const user = await User.findById(decoded.id)
       if (!user) return next(new Error('User not found'))
-
-      socket.user = user   // attach full user to socket
+      socket.user = user
       next()
     } catch {
       next(new Error('Unauthorized'))
@@ -36,26 +33,20 @@ export function initSocket(httpServer) {
     const user = socket.user
     console.log(`✅ Connected: ${user.username} (${socket.id})`)
 
-    // Mark online
     onlineUsers.set(user._id.toString(), socket.id)
     await User.findByIdAndUpdate(user._id, { isOnline: true })
     io.emit('user:online', user._id.toString())
-
-    // Send current online user list to the newly connected client
     socket.emit('users:online', Array.from(onlineUsers.keys()))
 
-    // ── Join a room ────────────────────────────────────────────────────────────
+    // ── Join room ──────────────────────────────────────────────────────────
     socket.on('room:join', (roomId) => {
-      // Leave all previous rooms first (except socket's own room)
-      socket.rooms.forEach((r) => {
-        if (r !== socket.id) socket.leave(r)
-      })
+      socket.rooms.forEach((r) => { if (r !== socket.id) socket.leave(r) })
       socket.join(roomId)
       console.log(`${user.username} joined room: ${roomId}`)
     })
 
-    // ── Send a message ─────────────────────────────────────────────────────────
-    socket.on('message:send', async ({ roomId, content, type = 'text' }) => {
+    // ── Send message (text, image, or file) ────────────────────────────────
+    socket.on('message:send', async ({ roomId, content, type = 'text', fileName = '' }) => {
       try {
         if (!content?.trim()) return
 
@@ -64,19 +55,21 @@ export function initSocket(httpServer) {
           room: roomId,
           content: content.trim(),
           type,
+          fileName,
         })
 
         const populated = await message.populate('sender', 'username avatar')
 
-        // Shape the message to match what the frontend expects
         const payload = {
-          _id: populated._id.toString(),
-          senderId: populated.sender._id.toString(),
+          _id:        populated._id.toString(),
+          senderId:   populated.sender._id.toString(),
           senderName: populated.sender.username,
-          content: populated.content,
-          type: populated.type,
-          createdAt: populated.createdAt.toISOString(),
-          room: populated.room,
+          senderAvatar: populated.sender.avatar || '',
+          content:    populated.content,
+          type:       populated.type,
+          fileName:   populated.fileName || '',
+          createdAt:  populated.createdAt.toISOString(),
+          room:       populated.room,
         }
 
         io.to(roomId).emit('message:receive', payload)
@@ -86,7 +79,7 @@ export function initSocket(httpServer) {
       }
     })
 
-    // ── Typing indicators ──────────────────────────────────────────────────────
+    // ── Typing indicators ──────────────────────────────────────────────────
     socket.on('typing:start', ({ roomId }) => {
       socket.to(roomId).emit('typing:start', {
         userId: user._id.toString(),
@@ -102,7 +95,7 @@ export function initSocket(httpServer) {
       })
     })
 
-    // ── Disconnect ─────────────────────────────────────────────────────────────
+    // ── Disconnect ─────────────────────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log(`❌ Disconnected: ${user.username}`)
       onlineUsers.delete(user._id.toString())

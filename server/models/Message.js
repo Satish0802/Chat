@@ -23,7 +23,7 @@ const messageSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'image'],
+      enum: ['text', 'image', 'file'],
       default: 'text',
     },
     readBy: [
@@ -32,6 +32,8 @@ const messageSchema = new Schema(
         ref: 'User',
       },
     ],
+    fileName: { type: String, default: '' },
+
   },
   { timestamps: true }
 )

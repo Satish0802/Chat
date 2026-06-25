@@ -1,16 +1,18 @@
+import './env.js'
 import express from 'express'
 import mongoose from 'mongoose'
-import dotenv from 'dotenv'
 import cors from 'cors'
 import { createServer } from 'http'
 import { initSocket } from './socket/index.js'
 import authRoutes from './routes/auth.js'
 import messageRoutes from './routes/messages.js'
+import uploadRoutes from './routes/upload.js'
 
-dotenv.config()
 
 const app = express()
 const httpServer = createServer(app)
+
+
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.use(cors({
@@ -22,7 +24,7 @@ app.use(express.json())
 // ── Routes ─────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes)
 app.use('/api/messages', messageRoutes)
-
+app.use('/api/upload', uploadRoutes)
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }))
 
 // ── Socket.IO ──────────────────────────────────────────────────────────────────

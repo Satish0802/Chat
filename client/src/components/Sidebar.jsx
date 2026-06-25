@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 
 const CHANNELS = [
-  { id: 'general', name: 'general', unread: 0 },
-  { id: 'random', name: 'random', unread: 0 },
-  { id: 'dev-talk', name: 'dev-talk', unread: 0 },
+  { id: 'general',  name: 'general' },
+  { id: 'random',   name: 'random' },
+  { id: 'dev-talk', name: 'dev-talk' },
 ]
 
 function initials(name = '') {
@@ -18,6 +19,7 @@ const AVATAR_COLORS = [
   'bg-sky-900 text-sky-300',
   'bg-pink-900 text-pink-300',
 ]
+
 function avatarColor(id = '') {
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash)
@@ -27,6 +29,7 @@ function avatarColor(id = '') {
 export default function Sidebar({ activeRoom, onRoomSelect, currentUser, onlineUsers, onLogout }) {
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
+  const navigate = useNavigate()
 
   useEffect(() => {
     api.get('/auth/users').then(r => setUsers(r.data)).catch(console.error)
@@ -44,6 +47,7 @@ export default function Sidebar({ activeRoom, onRoomSelect, currentUser, onlineU
 
   return (
     <aside className="w-56 flex-shrink-0 bg-zinc-900 flex flex-col select-none">
+
       {/* App header */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center gap-2 mb-3">
@@ -94,9 +98,17 @@ export default function Sidebar({ activeRoom, onRoomSelect, currentUser, onlineU
                   : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
             >
               <div className="relative flex-shrink-0">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-semibold ${avatarColor(u._id)}`}>
-                  {initials(u.username)}
-                </div>
+                {u.avatar ? (
+                  <img
+                    src={u.avatar}
+                    alt={u.username}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-semibold ${avatarColor(u._id)}`}>
+                    {initials(u.username)}
+                  </div>
+                )}
                 {isOnline && (
                   <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border-2 border-zinc-900" />
                 )}
@@ -107,28 +119,42 @@ export default function Sidebar({ activeRoom, onRoomSelect, currentUser, onlineU
         })}
       </div>
 
-      {/* Current user footer */}
-<div className="px-3 py-2.5 bg-zinc-950 border-t border-zinc-800 flex items-center gap-2.5">
-  <div className="relative flex-shrink-0">
-    <div className="w-8 h-8 rounded-full bg-emerald-700 text-emerald-200 flex items-center justify-center text-xs font-semibold">
-      {initials(currentUser?.username || '')}
-    </div>
-    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950" />
-  </div>
-  <div className="flex-1 min-w-0">
-    <p className="text-white text-xs font-semibold truncate">{currentUser?.username}</p>
-    <p className="text-emerald-500 text-[10px] font-medium">● Online</p>
-  </div>
-  <button
-    onClick={onLogout}
-    title="Logout"
-    className="text-zinc-500 hover:text-red-400 transition-colors flex-shrink-0 p-1 rounded hover:bg-zinc-800"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" />
-    </svg>
-  </button>
-</div>
+      {/* Current user footer — click to go to profile */}
+      <div className="px-3 py-2.5 bg-zinc-950 border-t border-zinc-800 flex items-center gap-2.5">
+        <button
+          onClick={() => navigate('/profile')}
+          className="relative flex-shrink-0 group"
+          title="View profile"
+        >
+          {currentUser?.avatar ? (
+            <img
+              src={currentUser.avatar}
+              alt="Your avatar"
+              className="w-8 h-8 rounded-full object-cover ring-1 ring-zinc-700 group-hover:ring-violet-500 transition-all"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-emerald-700 text-emerald-200 flex items-center justify-center text-xs font-semibold ring-1 ring-zinc-700 group-hover:ring-violet-500 transition-all">
+              {initials(currentUser?.username || '')}
+            </div>
+          )}
+          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-950" />
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-white text-xs font-semibold truncate">{currentUser?.username}</p>
+          <p className="text-emerald-500 text-[10px] font-medium">● Online</p>
+        </div>
+
+        <button
+          onClick={onLogout}
+          title="Logout"
+          className="text-zinc-500 hover:text-red-400 transition-colors flex-shrink-0 p-1 rounded hover:bg-zinc-800"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" />
+          </svg>
+        </button>
+      </div>
     </aside>
   )
 }

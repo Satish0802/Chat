@@ -22,6 +22,11 @@ export function useSocket(roomId) {
 
     socket.on('connect', () => console.log('Socket connected'))
     socket.on('connect_error', (err) => console.error('Socket error:', err.message))
+    socket.on('connect', () => {
+  console.log('Socket connected')
+  // Rejoin current room on reconnect
+  if (roomId) socket.emit('room:join', roomId)
+})
 
     // Online presence
     socket.on('users:online', (ids) => setOnlineUsers(ids))
@@ -49,23 +54,34 @@ export function useSocket(roomId) {
 
   // ── Join room whenever roomId changes ──────────────────────────────────────
   useEffect(() => {
-    if (!socketRef.current?.connected || !roomId) return
-    socketRef.current.emit('room:join', roomId)
-    setMessages([])       // clear while history loads
-    setTypingUsers([])
-  }, [roomId])
+  if (!socketRef.current || !roomId) return
 
-  // ── Actions ────────────────────────────────────────────────────────────────
-  const sendMessage = (content) => {
-    socketRef.current?.emit('message:send', { roomId, content })
+  const joinRoom = () => {
+    socketRef.current.emit('room:join', roomId)
+    setMessages([])
+    setTypingUsers([])
   }
 
+  // If already connected, join immediately
+  if (socketRef.current.connected) {
+    joinRoom()
+  } else {
+    // Wait for connection then join
+    socketRef.current.once('connect', joinRoom)
+  }
+}, [roomId])
+
+  // ── Actions ────────────────────────────────────────────────────────────────
   const sendTyping = (isTyping) => {
     socketRef.current?.emit(
       isTyping ? 'typing:start' : 'typing:stop',
       { roomId }
     )
   }
+
+  const sendMessage = (content, type = 'text', fileName = '') => {
+  socketRef.current?.emit('message:send', { roomId, content, type, fileName })
+}
 
   return {
     messages,

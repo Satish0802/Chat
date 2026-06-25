@@ -1,6 +1,6 @@
 # Chatwave
 
-A real-time full-stack chat application built with the MERN stack and Socket.IO. Supports group channels, direct messages, live typing indicators, and online presence — with a clean dark-sidebar UI.
+A real-time full-stack chat application built with the MERN stack and Socket.IO. Supports group channels, direct messages, live typing indicators, online presence, user avatars, and file sharing — with a clean dark-sidebar UI.
 
 **Live demo:** _coming soon_
 
@@ -10,11 +10,12 @@ A real-time full-stack chat application built with the MERN stack and Socket.IO.
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, Tailwind CSS v3 |
+| Frontend | React 19, Vite, Tailwind CSS v3, Zustand |
 | Backend | Node.js, Express.js |
 | Database | MongoDB Atlas, Mongoose |
 | Real-time | Socket.IO |
 | Auth | JWT (jsonwebtoken), bcryptjs |
+| File Storage | Cloudinary, Multer |
 | Deployment | Vercel (client), Render (server) |
 
 ---
@@ -26,6 +27,8 @@ A real-time full-stack chat application built with the MERN stack and Socket.IO.
 - **Direct messages** — private 1-to-1 conversations
 - **Typing indicators** — live "Alex is typing..." with debounce
 - **Online presence** — green dot shows who's currently connected
+- **User avatars & profiles** — upload and display profile pictures via Cloudinary; dedicated profile page
+- **File & image sharing** — send images and attachments via Cloudinary with Multer upload handling
 - **Message clustering** — consecutive messages from the same sender group together (no repeated avatars)
 - **Date separators** — automatic Today / Yesterday / date labels between message groups
 - **JWT authentication** — register, login, protected routes and socket connections
@@ -40,6 +43,8 @@ chatwave/
 ├── client/                   # React frontend (Vite)
 │   ├── public/
 │   └── src/
+│       ├── assets/
+│       │   └── hero.png
 │       ├── components/
 │       │   ├── Sidebar.jsx       # Channel list, DMs, user footer
 │       │   ├── TopBar.jsx        # Room header and action buttons
@@ -49,7 +54,8 @@ chatwave/
 │       ├── pages/
 │       │   ├── ChatPage.jsx      # Main layout, wires all components
 │       │   ├── LoginPage.jsx
-│       │   └── RegisterPage.jsx
+│       │   ├── RegisterPage.jsx
+│       │   └── ProfilePage.jsx   # User profile & avatar management
 │       ├── hooks/
 │       │   └── useSocket.js      # Socket.IO connection + event handlers
 │       ├── context/
@@ -59,13 +65,15 @@ chatwave/
 │
 └── server/                   # Express backend
     ├── models/
-    │   ├── User.js               # username, email, password (hashed), isOnline
-    │   └── Message.js            # sender, room, content, type, readBy
+    │   ├── User.js               # username, email, password (hashed), avatar, isOnline
+    │   └── Message.js            # sender, room, content, type, readBy, fileUrl
     ├── routes/
     │   ├── auth.js               # POST /api/auth/register, /login
-    │   └── messages.js           # GET /api/messages/:room
+    │   ├── messages.js           # GET /api/messages/:room
+    │   └── upload.js             # POST /api/upload — Cloudinary image/file upload
     ├── middleware/
-    │   └── auth.js               # JWT protect middleware
+    │   ├── auth.js               # JWT protect middleware
+    │   └── upload.js             # Multer + Cloudinary storage config
     ├── socket/
     │   └── index.js              # Socket.IO init, event handlers
     └── index.js                  # Entry point, Express + HTTP server
@@ -79,6 +87,7 @@ chatwave/
 
 - Node.js v18+
 - A [MongoDB Atlas](https://www.mongodb.com/atlas) account and cluster
+- A [Cloudinary](https://cloudinary.com) account (for avatar & file uploads)
 
 ### 1. Clone the repo
 
@@ -101,6 +110,11 @@ MONGO_URI=mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/chatwave
 JWT_SECRET=your_secret_key_here
 CLIENT_URL=http://localhost:5173
 PORT=5000
+
+# Cloudinary credentials
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 Start the server:
@@ -166,6 +180,9 @@ npm run dev
 | `JWT_SECRET` | Secret key for signing JWT tokens |
 | `CLIENT_URL` | Frontend URL for CORS (use Vercel URL in production) |
 | `PORT` | Port to run the server on (default: 5000) |
+| `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | Your Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Your Cloudinary API secret |
 
 ### Client (`client/.env`)
 
@@ -188,6 +205,26 @@ npm run dev
 | Server → Client | `typing:stop` | `{ userId, roomId }` |
 | Server → Client | `user:online` | `userId` |
 | Server → Client | `user:offline` | `userId` |
+
+---
+
+## API Endpoints
+
+### Auth
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login user |
+
+### Messages
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/messages/:room` | Fetch messages for a room |
+
+### Upload
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/upload` | Upload image/file to Cloudinary (multipart/form-data) |
 
 ---
 
@@ -214,7 +251,6 @@ npm run dev
 ## Roadmap
 
 - [ ] Read receipts (double tick per message)
-- [ ] Image sharing via Cloudinary
 - [ ] Emoji reactions
 - [ ] Unread message count per room
 - [ ] Message search
