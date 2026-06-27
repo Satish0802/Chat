@@ -6,8 +6,8 @@ export function useSocket(roomId) {
   const { token } = useAuth()
   const socketRef = useRef(null)
   const [messages, setMessages] = useState([])
-  const [typingUsers, setTypingUsers] = useState([])   // array of usernames
-  const [onlineUsers, setOnlineUsers] = useState([])   // array of userIds
+  const [typingUsers, setTypingUsers] = useState([])
+  const [onlineUsers, setOnlineUsers] = useState([])
 
   // ── Connect once on mount, disconnect on unmount ───────────────────────────
   useEffect(() => {
@@ -20,13 +20,11 @@ export function useSocket(roomId) {
 
     socketRef.current = socket
 
-    socket.on('connect', () => console.log('Socket connected'))
-    socket.on('connect_error', (err) => console.error('Socket error:', err.message))
     socket.on('connect', () => {
-  console.log('Socket connected')
-  // Rejoin current room on reconnect
-  if (roomId) socket.emit('room:join', roomId)
-})
+      console.log('Socket connected')
+      if (roomId) socket.emit('room:join', roomId)
+    })
+    socket.on('connect_error', (err) => console.error('Socket error:', err.message))
 
     // Online presence
     socket.on('users:online', (ids) => setOnlineUsers(ids))
@@ -37,6 +35,13 @@ export function useSocket(roomId) {
     socket.on('message:receive', (msg) =>
       setMessages(prev => [...prev, msg])
     )
+
+    // Read receipts — update readBy for a specific message
+    socket.on('message:read', ({ messageId, readBy }) => {
+      setMessages(prev => prev.map(msg =>
+        msg._id === messageId ? { ...msg, readBy } : msg
+      ))
+    })
 
     // Typing
     socket.on('typing:start', ({ username }) =>
@@ -54,22 +59,20 @@ export function useSocket(roomId) {
 
   // ── Join room whenever roomId changes ──────────────────────────────────────
   useEffect(() => {
-  if (!socketRef.current || !roomId) return
+    if (!socketRef.current || !roomId) return
 
-  const joinRoom = () => {
-    socketRef.current.emit('room:join', roomId)
-    setMessages([])
-    setTypingUsers([])
-  }
+    const joinRoom = () => {
+      socketRef.current.emit('room:join', roomId)
+      setMessages([])
+      setTypingUsers([])
+    }
 
-  // If already connected, join immediately
-  if (socketRef.current.connected) {
-    joinRoom()
-  } else {
-    // Wait for connection then join
-    socketRef.current.once('connect', joinRoom)
-  }
-}, [roomId])
+    if (socketRef.current.connected) {
+      joinRoom()
+    } else {
+      socketRef.current.once('connect', joinRoom)
+    }
+  }, [roomId])
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const sendTyping = (isTyping) => {
@@ -80,8 +83,12 @@ export function useSocket(roomId) {
   }
 
   const sendMessage = (content, type = 'text', fileName = '') => {
-  socketRef.current?.emit('message:send', { roomId, content, type, fileName })
-}
+    socketRef.current?.emit('message:send', { roomId, content, type, fileName })
+  }
+
+  const markAsRead = (messageId) => {
+    socketRef.current?.emit('message:read', { messageId })
+  }
 
   return {
     messages,
@@ -90,5 +97,6 @@ export function useSocket(roomId) {
     onlineUsers,
     sendMessage,
     sendTyping,
+    markAsRead,
   }
 }

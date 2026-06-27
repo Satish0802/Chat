@@ -21,25 +21,19 @@ export default function ChatPage() {
     onlineUsers,
     sendMessage,
     sendTyping,
+    markAsRead,  
   } = useSocket(activeRoom)
 
   // Load message history from REST whenever room changes
   useEffect(() => {
-    api.get(`/messages/${activeRoom}`)
-      .then(res => {
-        // Shape matches what socket emits
-        const shaped = res.data.map(m => ({
-          _id: m._id,
-          senderId: m.sender._id,
-          senderName: m.sender.username,
-          content: m.content,
-          type: m.type,
-          createdAt: m.createdAt,
-        }))
-        setMessages(shaped)
-      })
-      .catch(err => console.error('Failed to load history:', err))
-  }, [activeRoom, setMessages])
+  api.get(`/messages/${activeRoom}`)
+    .then(res => {
+      console.log('MESSAGES:', res.data)
+      console.log('CURRENT USER:', user)
+      setMessages(res.data)
+    })
+    .catch(err => console.error('Failed to load history:', err))
+}, [activeRoom, setMessages])
 
   const handleRoomSelect = (roomId, displayName) => {
   setActiveRoom(roomId)
@@ -72,10 +66,11 @@ const handleSend = (content, type = 'text', fileName = '') => {
           messages={messages}
           currentUser={user}
           typingUsers={typingUsers}
+          markAsRead={markAsRead}
         />
 
         <MessageInput
-          onSend={sendMessage}
+          onSend={handleSend}
           onTyping={sendTyping}
           roomName={roomName}
         />

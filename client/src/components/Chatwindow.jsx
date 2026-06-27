@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
 
-// Groups consecutive messages by same sender so we only show
-// avatar + name on the first message in a cluster
 function groupMessages(messages) {
   return messages.map((msg, i) => {
     const prev = messages[i - 1]
     const showAvatar =
       !prev ||
       prev.senderId !== msg.senderId ||
-      new Date(msg.createdAt) - new Date(prev.createdAt) > 5 * 60 * 1000 // 5 min gap
+      new Date(msg.createdAt) - new Date(prev.createdAt) > 5 * 60 * 1000
     return { ...msg, showAvatar }
   })
 }
@@ -25,7 +23,6 @@ function formatDateSep(dateStr) {
   return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-// Insert date separator objects between messages from different days
 function injectDateSeps(messages) {
   const result = []
   let lastDate = null
@@ -40,13 +37,61 @@ function injectDateSeps(messages) {
   return result
 }
 
-export default function ChatWindow({ messages, currentUser, typingUsers }) {
+export default function ChatWindow({ messages, currentUser, typingUsers, markAsRead }) {
   const bottomRef = useRef(null)
+  const messagesRef = useRef(new Map())
+  const readQueue = useRef(new Set())
+  const observerRef = useRef(null)
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, typingUsers])
+
+  // ── IntersectionObserver: mark visible messages as read ────────────────────
+  useEffect(() => {
+    if (!markAsRead || !currentUser?._id) return
+
+    // Use a ref so the observer callback always sees latest messages
+    const getMessages = () => messages
+
+    observerRef.current = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return
+
+        const messageId = entry.target.dataset.messageId
+        if (!messageId || readQueue.current.has(messageId)) return
+
+        const msg = getMessages().find(m => m._id === messageId)
+        if (!msg) return
+
+        const isOwn = String(item.senderId) === String(currentUser?._id)
+        const alreadyRead = msg.readBy?.includes(currentUser._id)
+
+        if (!isOwn && !alreadyRead) {
+          readQueue.current.add(messageId)
+          markAsRead(messageId)
+        }
+      })
+    }, { threshold: 0.5 })
+
+    // Observe all message elements
+    messagesRef.current.forEach((el) => {
+      if (el) observerRef.current.observe(el)
+    })
+
+    return () => {
+      observerRef.current?.disconnect()
+    }
+  }, [markAsRead, currentUser?._id]) // re-create observer when these change
+
+  // Re-observe when messages change (new messages arrive)
+  useEffect(() => {
+    if (!observerRef.current) return
+    messagesRef.current.forEach((el) => {
+      if (el) observerRef.current.observe(el)
+    })
+  }, [messages.length])
 
   const grouped = groupMessages(messages)
   const withSeps = injectDateSeps(grouped)
@@ -84,12 +129,24 @@ export default function ChatWindow({ messages, currentUser, typingUsers }) {
         }
 
         return (
-          <div key={item._id} className={item.showAvatar ? 'pt-2' : 'pt-0.5'}>
+          <div
+            key={item._id}
+            ref={el => { messagesRef.current.set(item._id, el) }}
+            data-message-id={item._id}
+            className={item.showAvatar ? 'pt-2' : 'pt-0.5'}
+          >
             <MessageBubble
-              message={item}
-              isOwn={item.senderId === currentUser?._id}
-              showAvatar={item.showAvatar}
-            />
+  content={item.content}
+  type={item.type}
+  fileName={item.fileName}
+  createdAt={item.createdAt}
+  senderId={item.senderId}
+  senderName={item.senderName}
+  senderAvatar={item.senderAvatar}
+  readBy={item.readBy}
+  isOwn={item.senderId === currentUser?._id}
+  showAvatar={item.showAvatar}
+/>
           </div>
         )
       })}
