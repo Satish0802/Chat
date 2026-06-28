@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import { useAuth } from '../context/AuthContext'
 
@@ -8,8 +8,15 @@ export function useSocket(roomId) {
   const [messages, setMessages] = useState([])
   const [typingUsers, setTypingUsers] = useState([])
   const [onlineUsers, setOnlineUsers] = useState([])
+  const incomingCallbackRef = useRef(null)
+  const activeRoomRef = useRef(roomId)
 
-  // ── Connect once on mount, disconnect on unmount ───────────────────────────
+  // Keep activeRoomRef in sync
+  useEffect(() => {
+    activeRoomRef.current = roomId
+  }, [roomId])
+
+  // Connect once on mount
   useEffect(() => {
     if (!token) return
 
@@ -22,34 +29,40 @@ export function useSocket(roomId) {
 
     socket.on('connect', () => {
       console.log('Socket connected')
-      if (roomId) socket.emit('room:join', roomId)
+      // Join ALL rooms on connect so we receive messages from all
+      socket.emit('rooms:join-all')
     })
     socket.on('connect_error', (err) => console.error('Socket error:', err.message))
 
-    // Online presence
     socket.on('users:online', (ids) => setOnlineUsers(ids))
     socket.on('user:online',  (id)  => setOnlineUsers(prev => [...new Set([...prev, id])]))
     socket.on('user:offline', (id)  => setOnlineUsers(prev => prev.filter(u => u !== id)))
 
-    // Incoming messages
-    socket.on('message:receive', (msg) =>
-      setMessages(prev => [...prev, msg])
-    )
+    socket.on('message:receive', (msg) => {
+      // Only add to messages state if it's for the active room
+      if (msg.room === activeRoomRef.current) {
+        setMessages(prev => [...prev, msg])
+      }
+      // Always fire the unread callback
+      if (incomingCallbackRef.current) {
+        incomingCallbackRef.current(msg, msg.room)
+      }
+    })
 
-    // Read receipts — update readBy for a specific message
     socket.on('message:read', ({ messageId, readBy }) => {
       setMessages(prev => prev.map(msg =>
         msg._id === messageId ? { ...msg, readBy } : msg
       ))
     })
 
-    // Typing
-    socket.on('typing:start', ({ username }) =>
-      setTypingUsers(prev => [...new Set([...prev, username])])
-    )
-    socket.on('typing:stop', ({ username }) =>
-      setTypingUsers(prev => prev.filter(u => u !== username))
-    )
+    socket.on('typing:start', ({ username, roomId: tRoom }) => {
+      if (tRoom === activeRoomRef.current)
+        setTypingUsers(prev => [...new Set([...prev, username])])
+    })
+    socket.on('typing:stop', ({ username, roomId: tRoom }) => {
+      if (tRoom === activeRoomRef.current)
+        setTypingUsers(prev => prev.filter(u => u !== username))
+    })
 
     return () => {
       socket.disconnect()
@@ -57,29 +70,25 @@ export function useSocket(roomId) {
     }
   }, [token])
 
-  // ── Join room whenever roomId changes ──────────────────────────────────────
+  // When room changes, clear local state and join new room
   useEffect(() => {
     if (!socketRef.current || !roomId) return
 
-    const joinRoom = () => {
+    const join = () => {
       socketRef.current.emit('room:join', roomId)
       setMessages([])
       setTypingUsers([])
     }
 
     if (socketRef.current.connected) {
-      joinRoom()
+      join()
     } else {
-      socketRef.current.once('connect', joinRoom)
+      socketRef.current.once('connect', join)
     }
   }, [roomId])
 
-  // ── Actions ────────────────────────────────────────────────────────────────
   const sendTyping = (isTyping) => {
-    socketRef.current?.emit(
-      isTyping ? 'typing:start' : 'typing:stop',
-      { roomId }
-    )
+    socketRef.current?.emit(isTyping ? 'typing:start' : 'typing:stop', { roomId })
   }
 
   const sendMessage = (content, type = 'text', fileName = '') => {
@@ -90,6 +99,13 @@ export function useSocket(roomId) {
     socketRef.current?.emit('message:read', { messageId })
   }
 
+  const onIncomingMessage = useCallback((cb) => {
+    incomingCallbackRef.current = cb
+    return () => { incomingCallbackRef.current = null }
+  }, [])
+
+  
+
   return {
     messages,
     setMessages,
@@ -98,5 +114,6 @@ export function useSocket(roomId) {
     sendMessage,
     sendTyping,
     markAsRead,
+    onIncomingMessage,
   }
 }

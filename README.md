@@ -1,6 +1,6 @@
 # Chatwave
 
-A real-time full-stack chat application built with the MERN stack and Socket.IO. Supports group channels, direct messages, live typing indicators, online presence, user avatars, file sharing, and read receipts — with a clean dark-sidebar UI.
+A real-time full-stack chat application built with the MERN stack and Socket.IO. Supports group channels, direct messages, live typing indicators, online presence, user avatars, file sharing, read receipts, message search, and unread notifications — with a clean dark-sidebar UI.
 
 **Live demo:** _coming soon_
 
@@ -30,6 +30,9 @@ A real-time full-stack chat application built with the MERN stack and Socket.IO.
 - **User avatars & profiles** — upload and display profile pictures via Cloudinary; dedicated profile page
 - **File & image sharing** — send images and attachments via Cloudinary with Multer upload handling
 - **Read receipts** — double tick per message; grey when delivered, blue when read by the recipient; tracked via IntersectionObserver and persisted in MongoDB
+- **Message search** — keyword search in the current room with highlighted matches
+- **Notification bell** — unread badge count per room; bell dropdown lists all rooms with unread messages and navigates on click
+- **Shared media panel** — view all images and files ever sent in any room or DM, accessible from the top bar
 - **Message clustering** — consecutive messages from the same sender group together (no repeated avatars)
 - **Date separators** — automatic Today / Yesterday / date labels between message groups
 - **JWT authentication** — register, login, protected routes and socket connections
@@ -39,81 +42,46 @@ A real-time full-stack chat application built with the MERN stack and Socket.IO.
 
 ## Project structure
 
+```
 chatwave/
-
 ├── client/                   # React frontend (Vite)
-
 │   ├── public/
-
 │   └── src/
-
 │       ├── assets/
-
 │       │   └── hero.png
-
 │       ├── components/
-
-│       │   ├── Sidebar.jsx       # Channel list, DMs, user footer
-
-│       │   ├── TopBar.jsx        # Room header and action buttons
-
+│       │   ├── Sidebar.jsx       # Channel list, DMs, unread badges, user footer
+│       │   ├── TopBar.jsx        # Search, members/media panel, notification bell
 │       │   ├── ChatWindow.jsx    # Message feed with date separators and read tracking
-
 │       │   ├── MessageBubble.jsx # Individual message row with read status indicator
-
 │       │   └── MessageInput.jsx  # Textarea with send + typing emit
-
 │       ├── pages/
-
 │       │   ├── ChatPage.jsx      # Main layout, wires all components
-
 │       │   ├── LoginPage.jsx
-
 │       │   ├── RegisterPage.jsx
-
 │       │   └── ProfilePage.jsx   # User profile & avatar management
-
 │       ├── hooks/
-
 │       │   └── useSocket.js      # Socket.IO connection + event handlers
-
 │       ├── context/
-
 │       │   └── AuthContext.jsx   # JWT token + user state
-
 │       └── lib/
-
 │           └── api.js            # Axios instance with auth header
-
 │
-
 └── server/                   # Express backend
-
-├── models/
-
-│   ├── User.js               # username, email, password (hashed), avatar, isOnline
-
-│   └── Message.js            # sender, room, content, type, readBy, fileUrl
-
-├── routes/
-
-│   ├── auth.js               # POST /api/auth/register, /login
-
-│   ├── messages.js           # GET /api/messages/:room
-
-│   └── upload.js             # POST /api/upload — Cloudinary image/file upload
-
-├── middleware/
-
-│   ├── auth.js               # JWT protect middleware
-
-│   └── upload.js             # Multer + Cloudinary storage config
-
-├── socket/
-
-│   └── index.js              # Socket.IO init, event handlers incl. message:read
-
-└── index.js                  # Entry point, Express + HTTP server
+    ├── models/
+    │   ├── User.js               # username, email, password (hashed), avatar, isOnline
+    │   └── Message.js            # sender, room, content, type, readBy, fileUrl
+    ├── routes/
+    │   ├── auth.js               # POST /api/auth/register, /login
+    │   ├── messages.js           # GET /api/messages/:room
+    │   └── upload.js             # POST /api/upload — Cloudinary image/file upload
+    ├── middleware/
+    │   ├── auth.js               # JWT protect middleware
+    │   └── upload.js             # Multer + Cloudinary storage config
+    ├── socket/
+    │   └── index.js              # Socket.IO init, event handlers incl. message:read, rooms:join-all
+    └── index.js                  # Entry point, Express + HTTP server
+```
 
 ---
 
@@ -232,6 +200,7 @@ npm run dev
 
 | Direction | Event | Payload |
 |---|---|---|
+| Client → Server | `rooms:join-all` | _(none)_ |
 | Client → Server | `room:join` | `{ roomId }` |
 | Client → Server | `message:send` | `{ roomId, content }` |
 | Client → Server | `message:read` | `{ messageId }` |
@@ -239,8 +208,8 @@ npm run dev
 | Client → Server | `typing:stop` | `{ roomId }` |
 | Server → Client | `message:receive` | Message document (populated) |
 | Server → Client | `message:read` | `{ messageId, readBy }` |
-| Server → Client | `typing:start` | `{ userId, roomId }` |
-| Server → Client | `typing:stop` | `{ userId, roomId }` |
+| Server → Client | `typing:start` | `{ userId, username, roomId }` |
+| Server → Client | `typing:stop` | `{ userId, username, roomId }` |
 | Server → Client | `user:online` | `userId` |
 | Server → Client | `user:offline` | `userId` |
 
@@ -289,9 +258,11 @@ npm run dev
 ## Roadmap
 
 - [x] Read receipts (double tick per message)
+- [x] Message search with keyword highlighting
+- [x] Unread message count per room
+- [x] Notification bell with room navigation
+- [x] Shared media & files panel
 - [ ] Emoji reactions
-- [ ] Unread message count per room
-- [ ] Message search
 - [ ] AI slash command (`/summarize` — summarizes last 20 messages using Claude API)
 
 ---

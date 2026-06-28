@@ -10,16 +10,21 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => ({
-    folder: 'chatwave/files',
-    resource_type: file.mimetype.startsWith('image/') ? 'image' : 'raw',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
-  }),
+  params: async (req, file) => {
+    const isPDF = file.mimetype === 'application/pdf'
+    const isImage = file.mimetype.startsWith('image/')
+    return {
+      folder: 'chatwave/files',
+      // Upload PDFs as 'image' so Cloudinary serves them inline via browser
+      resource_type: isImage || isPDF ? 'image' : 'raw',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx'],
+    }
+  },
 })
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = [
       'image/jpeg', 'image/png', 'image/webp',

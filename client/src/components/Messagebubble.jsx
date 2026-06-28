@@ -48,7 +48,7 @@ function ReadStatus({ readBy, senderId, isOwn }) {
 function FileBubble({ content, fileName, isOwn }) {
   return (
     
-      <a href={content}
+      <a href={content.replace('/raw/upload/', '/raw/upload/fl_attachment:false/')}
       target="_blank"
       rel="noopener noreferrer"
       className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 mt-1 max-w-xs transition-colors

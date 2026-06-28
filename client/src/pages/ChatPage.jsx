@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import TopBar from '../components/TopBar'
@@ -13,6 +13,8 @@ export default function ChatPage() {
   const navigate = useNavigate()
   const [activeRoom, setActiveRoom] = useState('general')
   const [roomName, setRoomName] = useState('general')
+  const [unreadCounts, setUnreadCounts] = useState({})
+  const activeRoomRef = useRef('general')
 
   const {
     messages,
@@ -21,28 +23,40 @@ export default function ChatPage() {
     onlineUsers,
     sendMessage,
     sendTyping,
-    markAsRead,  
+    markAsRead,
+    onIncomingMessage,
   } = useSocket(activeRoom)
 
-  // Load message history from REST whenever room changes
+  // Load message history
   useEffect(() => {
-  api.get(`/messages/${activeRoom}`)
-    .then(res => {
-      console.log('MESSAGES:', res.data)
-      console.log('CURRENT USER:', user)
-      setMessages(res.data)
+    api.get(`/messages/${activeRoom}`)
+      .then(res => { setMessages(res.data) })
+      .catch(err => console.error('Failed to load history:', err))
+  }, [activeRoom, setMessages])
+
+  // Track unread — use ref to avoid stale closure
+  useEffect(() => {
+    const unsub = onIncomingMessage((msg, room) => {
+      if (room !== activeRoomRef.current) {
+        setUnreadCounts(prev => ({
+          ...prev,
+          [room]: (prev[room] || 0) + 1,
+        }))
+      }
     })
-    .catch(err => console.error('Failed to load history:', err))
-}, [activeRoom, setMessages])
+    return unsub
+  }, [onIncomingMessage])
 
-  const handleRoomSelect = (roomId, displayName) => {
-  setActiveRoom(roomId)
-  setRoomName(displayName || roomId) // Fallback to roomId if displayName is not provided
-}
+  const handleRoomSelect = useCallback((roomId, displayName) => {
+    setActiveRoom(roomId)
+    activeRoomRef.current = roomId
+    setRoomName(displayName || roomId)
+    setUnreadCounts(prev => ({ ...prev, [roomId]: 0 }))
+  }, [])
 
-const handleSend = (content, type = 'text', fileName = '') => {
-  sendMessage(content, type, fileName)
-}
+  const handleSend = (content, type = 'text', fileName = '') => {
+    sendMessage(content, type, fileName)
+  }
 
   const handleLogout = () => {
     logout()
@@ -57,10 +71,18 @@ const handleSend = (content, type = 'text', fileName = '') => {
         currentUser={user}
         onlineUsers={onlineUsers}
         onLogout={handleLogout}
+        unreadCounts={unreadCounts}
       />
 
       <div className="flex flex-col flex-1 min-w-0 bg-zinc-900">
-        <TopBar roomId={activeRoom} roomName={roomName} onlineCount={onlineUsers.length} />
+        <TopBar
+          roomId={activeRoom}
+          roomName={roomName}
+          onlineCount={onlineUsers.length}
+          messages={messages}
+          onRoomSelect={(roomId) => handleRoomSelect(roomId, roomId)}
+          unreadCounts={unreadCounts}
+        />
 
         <ChatWindow
           messages={messages}

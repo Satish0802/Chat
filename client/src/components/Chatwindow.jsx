@@ -65,8 +65,8 @@ export default function ChatWindow({ messages, currentUser, typingUsers, markAsR
         const msg = getMessages().find(m => m._id === messageId)
         if (!msg) return
 
-        const isOwn = String(item.senderId) === String(currentUser?._id)
-        const alreadyRead = msg.readBy?.includes(currentUser._id)
+        const isOwn = String(msg.senderId) === String(currentUser?._id)
+        const alreadyRead = msg.readBy?.includes(String(currentUser._id))
 
         if (!isOwn && !alreadyRead) {
           readQueue.current.add(messageId)
@@ -144,7 +144,7 @@ export default function ChatWindow({ messages, currentUser, typingUsers, markAsR
   senderName={item.senderName}
   senderAvatar={item.senderAvatar}
   readBy={item.readBy}
-  isOwn={item.senderId === currentUser?._id}
+  isOwn={String(item.senderId) === String(currentUser?._id)}
   showAvatar={item.showAvatar}
 />
           </div>

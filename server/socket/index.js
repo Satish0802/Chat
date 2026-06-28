@@ -5,6 +5,9 @@ import Message from '../models/Message.js'
 
 const onlineUsers = new Map()
 
+// All known rooms — channels + any DM rooms seen
+const CHANNEL_ROOMS = ['general', 'random', 'dev-talk']
+
 export function initSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -14,7 +17,6 @@ export function initSocket(httpServer) {
     transports: ['websocket', 'polling'],
   })
 
-  // ── Auth middleware ────────────────────────────────────────────────────────
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token
@@ -38,14 +40,30 @@ export function initSocket(httpServer) {
     io.emit('user:online', user._id.toString())
     socket.emit('users:online', Array.from(onlineUsers.keys()))
 
-    // ── Join room ──────────────────────────────────────────────────────────
+    // Join all channels + all DM rooms this user is part of
+    socket.on('rooms:join-all', async () => {
+      // Join all channel rooms
+      for (const ch of CHANNEL_ROOMS) {
+        socket.join(ch)
+      }
+      // Find all DM rooms this user has messages in
+      const userIdStr = user._id.toString()
+      const dmRooms = await Message.distinct('room', {
+        room: { $regex: userIdStr },
+      })
+      for (const room of dmRooms) {
+        socket.join(room)
+      }
+      console.log(`${user.username} joined all rooms`)
+    })
+
+    // Join specific room (when user navigates to it)
     socket.on('room:join', (roomId) => {
-      socket.rooms.forEach((r) => { if (r !== socket.id) socket.leave(r) })
       socket.join(roomId)
       console.log(`${user.username} joined room: ${roomId}`)
     })
 
-    // ── Send message (text, image, or file) ────────────────────────────────
+    // Send message
     socket.on('message:send', async ({ roomId, content, type = 'text', fileName = '' }) => {
       try {
         if (!content?.trim()) return
@@ -56,7 +74,7 @@ export function initSocket(httpServer) {
           content: content.trim(),
           type,
           fileName,
-          readBy: [user._id], // sender implicitly "read" it
+          readBy: [user._id],
         })
 
         const populated = await message.populate('sender', 'username avatar')
@@ -81,13 +99,11 @@ export function initSocket(httpServer) {
       }
     })
 
-    // ── Mark message as read ───────────────────────────────────────────────
+    // Mark message as read
     socket.on('message:read', async ({ messageId }) => {
       try {
         const message = await Message.findById(messageId)
         if (!message) return
-
-        // Don't let sender mark their own message as read again
         if (message.sender.toString() === user._id.toString()) return
 
         const userIdStr = user._id.toString()
@@ -107,7 +123,7 @@ export function initSocket(httpServer) {
       }
     })
 
-    // ── Typing indicators ──────────────────────────────────────────────────
+    // Typing
     socket.on('typing:start', ({ roomId }) => {
       socket.to(roomId).emit('typing:start', {
         userId: user._id.toString(),
@@ -119,11 +135,11 @@ export function initSocket(httpServer) {
     socket.on('typing:stop', ({ roomId }) => {
       socket.to(roomId).emit('typing:stop', {
         userId: user._id.toString(),
+        username: user.username,
         roomId,
       })
     })
 
-    // ── Disconnect ─────────────────────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log(`❌ Disconnected: ${user.username}`)
       onlineUsers.delete(user._id.toString())
