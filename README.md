@@ -1,6 +1,6 @@
 # Chatwave
 
-A real-time full-stack chat application built with the MERN stack and Socket.IO. Supports group channels, direct messages, live typing indicators, online presence, user avatars, file sharing, read receipts, message search, and unread notifications — with a clean dark-sidebar UI.
+A real-time full-stack chat application built with the MERN stack and Socket.IO. Supports group channels, direct messages, live typing indicators, online presence, user avatars, file sharing, read receipts, message search, unread notifications, channel membership, and user discovery — with a clean dark-sidebar UI.
 
 **Live demo:** _coming soon_
 
@@ -23,8 +23,10 @@ A real-time full-stack chat application built with the MERN stack and Socket.IO.
 ## Features
 
 - **Real-time messaging** — messages appear instantly across all connected clients via WebSocket
-- **Group channels** — join named rooms like `#general` or `#dev-talk`
-- **Direct messages** — private 1-to-1 conversations
+- **Group channels** — join named rooms like `#general` or `#dev-talk`; new users auto-join `#general` only
+- **Channel membership** — channels are stored in MongoDB with a members list; users browse and join public channels via the sidebar
+- **Direct messages** — private 1-to-1 conversations; only previously messaged users appear in sidebar
+- **User discovery** — search for any user by username to start a new DM conversation
 - **Typing indicators** — live "Alex is typing..." with debounce
 - **Online presence** — green dot shows who's currently connected
 - **User avatars & profiles** — upload and display profile pictures via Cloudinary; dedicated profile page
@@ -33,6 +35,7 @@ A real-time full-stack chat application built with the MERN stack and Socket.IO.
 - **Message search** — keyword search in the current room with highlighted matches
 - **Notification bell** — unread badge count per room; bell dropdown lists all rooms with unread messages and navigates on click
 - **Shared media panel** — view all images and files ever sent in any room or DM, accessible from the top bar
+- **Last room persistence** — app reopens to the last active room on next login via localStorage
 - **Message clustering** — consecutive messages from the same sender group together (no repeated avatars)
 - **Date separators** — automatic Today / Yesterday / date labels between message groups
 - **JWT authentication** — register, login, protected routes and socket connections
@@ -50,13 +53,13 @@ chatwave/
 │       ├── assets/
 │       │   └── hero.png
 │       ├── components/
-│       │   ├── Sidebar.jsx       # Channel list, DMs, unread badges, user footer
+│       │   ├── Sidebar.jsx       # Channels, DMs, user search, unread badges
 │       │   ├── TopBar.jsx        # Search, members/media panel, notification bell
 │       │   ├── ChatWindow.jsx    # Message feed with date separators and read tracking
 │       │   ├── MessageBubble.jsx # Individual message row with read status indicator
 │       │   └── MessageInput.jsx  # Textarea with send + typing emit
 │       ├── pages/
-│       │   ├── ChatPage.jsx      # Main layout, wires all components
+│       │   ├── ChatPage.jsx      # Main layout, wires all components, last-room memory
 │       │   ├── LoginPage.jsx
 │       │   ├── RegisterPage.jsx
 │       │   └── ProfilePage.jsx   # User profile & avatar management
@@ -70,16 +73,19 @@ chatwave/
 └── server/                   # Express backend
     ├── models/
     │   ├── User.js               # username, email, password (hashed), avatar, isOnline
-    │   └── Message.js            # sender, room, content, type, readBy, fileUrl
+    │   ├── Message.js            # sender, room, content, type, readBy, fileUrl
+    │   └── Room.js               # name, type, isPrivate, createdBy, members[]
     ├── routes/
-    │   ├── auth.js               # POST /api/auth/register, /login
+    │   ├── auth.js               # register, login, user search, DM user list
     │   ├── messages.js           # GET /api/messages/:room
+    │   ├── rooms.js              # GET/POST rooms, join, leave, members
     │   └── upload.js             # POST /api/upload — Cloudinary image/file upload
     ├── middleware/
     │   ├── auth.js               # JWT protect middleware
     │   └── upload.js             # Multer + Cloudinary storage config
     ├── socket/
-    │   └── index.js              # Socket.IO init, event handlers incl. message:read, rooms:join-all
+    │   └── index.js              # Socket.IO init, rooms:join-all, message:read
+    ├── SeedRooms.js              # One-time script to create default channels in DB
     └── index.js                  # Entry point, Express + HTTP server
 ```
 
@@ -119,6 +125,12 @@ PORT=8080
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+```
+
+Seed default channels (run once):
+
+```bash
+node SeedRooms.js
 ```
 
 Start the server:
@@ -220,13 +232,24 @@ npm run dev
 ### Auth
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/register` | Register new user (auto-joins #general) |
 | POST | `/api/auth/login` | Login user |
+| GET | `/api/auth/users?search=` | Search users by username |
+| GET | `/api/auth/dm-users` | Get users current user has DM history with |
 
 ### Messages
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/api/messages/:room` | Fetch messages for a room |
+
+### Rooms
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/rooms` | Get all channels |
+| POST | `/api/rooms` | Create a new channel |
+| POST | `/api/rooms/:id/join` | Join a public channel |
+| POST | `/api/rooms/:id/leave` | Leave a channel |
+| GET | `/api/rooms/:id/members` | Get channel members |
 
 ### Upload
 | Method | Endpoint | Description |
@@ -262,8 +285,13 @@ npm run dev
 - [x] Unread message count per room
 - [x] Notification bell with room navigation
 - [x] Shared media & files panel
+- [x] Channel membership (join/leave, DB-backed)
+- [x] User discovery via search to start DMs
+- [x] Last active room persistence
+- [ ] Kick/remove members from channels
+- [x] Block users in DM
 - [ ] Emoji reactions
-- [ ] AI slash command (`/summarize` — summarizes last 20 messages using Claude API)
+- [ ] AI slash command (`/summarize` — summarizes last 20 messages using sny free API)
 
 ---
 

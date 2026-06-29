@@ -8,13 +8,26 @@ import { useSocket } from '../hooks/useSocket'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
 
+const STORAGE_KEY = 'chatwave_last_room'
+
+function getLastRoom() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+    return saved || { id: 'general', name: 'general' }
+  } catch {
+    return { id: 'general', name: 'general' }
+  }
+}
+
 export default function ChatPage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [activeRoom, setActiveRoom] = useState('general')
-  const [roomName, setRoomName] = useState('general')
+
+  const lastRoom = getLastRoom()
+  const [activeRoom, setActiveRoom] = useState(lastRoom.id)
+  const [roomName, setRoomName] = useState(lastRoom.name)
   const [unreadCounts, setUnreadCounts] = useState({})
-  const activeRoomRef = useRef('general')
+  const activeRoomRef = useRef(lastRoom.id)
 
   const {
     messages,
@@ -34,7 +47,7 @@ export default function ChatPage() {
       .catch(err => console.error('Failed to load history:', err))
   }, [activeRoom, setMessages])
 
-  // Track unread — use ref to avoid stale closure
+  // Track unread
   useEffect(() => {
     const unsub = onIncomingMessage((msg, room) => {
       if (room !== activeRoomRef.current) {
@@ -52,7 +65,13 @@ export default function ChatPage() {
     activeRoomRef.current = roomId
     setRoomName(displayName || roomId)
     setUnreadCounts(prev => ({ ...prev, [roomId]: 0 }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: roomId, name: displayName || roomId }))
   }, [])
+
+  // When user leaves a channel, go back to general
+  const handleLeaveRoom = useCallback(() => {
+    handleRoomSelect('general', 'general')
+  }, [handleRoomSelect])
 
   const handleSend = (content, type = 'text', fileName = '') => {
     sendMessage(content, type, fileName)
@@ -82,6 +101,8 @@ export default function ChatPage() {
           messages={messages}
           onRoomSelect={(roomId) => handleRoomSelect(roomId, roomId)}
           unreadCounts={unreadCounts}
+          currentUser={user}
+          onLeaveRoom={handleLeaveRoom}
         />
 
         <ChatWindow

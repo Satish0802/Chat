@@ -7,6 +7,7 @@ import { initSocket } from './socket/index.js'
 import authRoutes from './routes/auth.js'
 import messageRoutes from './routes/messages.js'
 import uploadRoutes from './routes/upload.js'
+import roomsRouter from './routes/rooms.js'
 
 
 const app = express()
@@ -25,6 +26,7 @@ app.use(express.json())
 app.use('/api/auth', authRoutes)
 app.use('/api/messages', messageRoutes)
 app.use('/api/upload', uploadRoutes)
+app.use('/api/rooms', roomsRouter)
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }))
 
 // ── Socket.IO ──────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 
-const { Schema } = mongoose
+const { Schema, Types } = mongoose
 
 const userSchema = new Schema(
   {
@@ -32,6 +32,12 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    blockedUsers: [
+      {
+        type: Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   { timestamps: true }
 )
@@ -47,10 +53,11 @@ userSchema.methods.matchPassword = async function (plainPassword) {
   return bcrypt.compare(plainPassword, this.password)
 }
 
-// Never send password in responses
+// Never send password or blockedUsers in responses
 userSchema.methods.toJSON = function () {
   const obj = this.toObject()
   delete obj.password
+  delete obj.blockedUsers
   return obj
 }
 

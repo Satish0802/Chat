@@ -1,6 +1,8 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
+import Room from '../models/Room.js'
+import Message from '../models/Message.js'
 import { protect } from '../middleware/auth.js'
 import { upload } from '../middleware/upload.js'
 
@@ -23,6 +25,13 @@ router.post('/register', async (req, res) => {
     }
 
     const user = await User.create({ username, email, password })
+
+    // Auto-join #general only
+    await Room.findOneAndUpdate(
+      { name: 'general', type: 'channel' },
+      { $addToSet: { members: user._id } }
+    )
+
     const token = signToken(user._id)
     res.status(201).json({ token, user })
   } catch (err) {
@@ -57,14 +66,51 @@ router.get('/me', protect, (req, res) => {
   res.json({ user: req.user })
 })
 
-// ── GET /api/auth/users — all users except self ──────────────────────────────
+// ── GET /api/auth/users — search users by name (excludes self) ───────────────
 router.get('/users', protect, async (req, res) => {
   try {
-    const users = await User.find({ _id: { $ne: req.user._id } })
-      .select('username avatar isOnline')
+    const { search } = req.query
+    const query = { _id: { $ne: req.user._id } }
+    if (search?.trim()) {
+      query.username = { $regex: search.trim(), $options: 'i' }
+    } else {
+      // No search query — return empty so sidebar doesn't show all users
+      return res.json([])
+    }
+    const users = await User.find(query).select('username avatar isOnline').limit(10)
     res.json(users)
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch users' })
+  }
+})
+
+// ── GET /api/auth/dm-users — users current user has DM history with ──────────
+router.get('/dm-users', protect, async (req, res) => {
+  try {
+    const userId = req.user._id.toString()
+
+    // DM room IDs contain underscore and the user's ID
+    const allRooms = await Message.distinct('room', {
+      room: { $regex: userId }
+    })
+
+    // Filter to only DM rooms (contain underscore separator)
+    const dmRooms = allRooms.filter(r => r.includes('_'))
+
+    // Extract other user IDs
+    const otherUserIds = dmRooms
+      .map(room => room.split('_').find(p => p !== userId))
+      .filter(Boolean)
+
+    if (otherUserIds.length === 0) return res.json([])
+
+    const users = await User.find({ _id: { $in: otherUserIds } })
+      .select('username avatar isOnline')
+
+    res.json(users)
+  } catch (err) {
+    console.error('DM users error:', err)
+    res.status(500).json({ error: 'Could not fetch DM users' })
   }
 })
 
@@ -80,7 +126,6 @@ router.put('/profile', protect, async (req, res) => {
     if (!username?.trim())
       return res.status(400).json({ error: 'Username is required' })
 
-    // Check if username already taken by someone else
     const existing = await User.findOne({ username, _id: { $ne: req.user._id } })
     if (existing) return res.status(409).json({ error: 'Username already taken' })
 
@@ -96,7 +141,7 @@ router.put('/profile', protect, async (req, res) => {
   }
 })
 
-// ── POST /api/auth/avatar — upload avatar image ──────────────────────────────
+// ── POST /api/auth/avatar ────────────────────────────────────────────────────
 router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
@@ -114,3 +159,19 @@ router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
 })
 
 export default router
+
+// ── POST /api/auth/block/:userId — block a user ──────────────────────────────
+router.post('/block/:userId', protect, async (req, res) => {
+  try {
+    const { userId } = req.params
+    if (userId === req.user._id.toString())
+      return res.status(400).json({ error: 'Cannot block yourself' })
+
+    await User.findByIdAndUpdate(req.user._id, {
+      $addToSet: { blockedUsers: userId }
+    })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Could not block user' })
+  }
+})
